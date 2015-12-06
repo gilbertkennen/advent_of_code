@@ -121,6 +121,7 @@ defmodule VariableLights do
     :ets.update_counter(table, coords, {2, amount, 0, 0}, {coords, 0})
   end
 
+
   def act(:on, table, coords) do
     inc(table, coords, 1)
   end
@@ -133,22 +134,27 @@ defmodule VariableLights do
     dec(table, coords, -1)
   end
 
+
   def do_stuff({action, ranges}, table) do
     block(ranges)
     |> Enum.each(&act(action, table, &1))
   end
 
+
   def sum(table) do
     :ets.foldl(fn {_, n}, acc -> acc + n end, 0, table)
   end
+
 
   def init do
     :ets.new(__MODULE__, [:set])
   end
 
+
   def cleanup(table) do
     :ets.delete(table)
   end
+
 
   def execute(filename) do
     table = init()
