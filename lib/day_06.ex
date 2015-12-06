@@ -108,17 +108,25 @@ defmodule VariableLights do
   import SantaLights, only: [parse_file: 1]
 
 
+  def execute(filename) do
+    table = init()
+
+    filename
+    |> parse_file
+    |> Enum.each(fn {action, ranges} ->
+      ranges
+      |> block
+      |> Enum.each(&act(action, table, &1))
+    end)
+
+    result = sum(table)
+    cleanup(table)
+    result
+  end
+
+
   def block({x_range, y_range}) do
     for x <- x_range, y <- y_range, do: {x, y}
-  end
-
-
-  def inc(table, coords, amount) do
-    :ets.update_counter(table, coords, amount, {coords, 0})
-  end
-
-  def dec(table, coords, amount) do
-    :ets.update_counter(table, coords, {2, amount, 0, 0}, {coords, 0})
   end
 
 
@@ -135,17 +143,6 @@ defmodule VariableLights do
   end
 
 
-  def do_stuff({action, ranges}, table) do
-    block(ranges)
-    |> Enum.each(&act(action, table, &1))
-  end
-
-
-  def sum(table) do
-    :ets.foldl(fn {_, n}, acc -> acc + n end, 0, table)
-  end
-
-
   def init do
     :ets.new(__MODULE__, [:set])
   end
@@ -156,16 +153,18 @@ defmodule VariableLights do
   end
 
 
-  def execute(filename) do
-    table = init()
+  def inc(table, coords, amount) do
+    :ets.update_counter(table, coords, amount, {coords, 0})
+  end
 
-    filename
-    |> parse_file
-    |> Enum.each(&do_stuff(&1, table))
 
-    result = sum(table)
-    cleanup(table)
-    result
+  def dec(table, coords, amount) do
+    :ets.update_counter(table, coords, {2, amount, 0, 0}, {coords, 0})
+  end
+
+
+  def sum(table) do
+    :ets.foldl(fn {_, n}, acc -> acc + n end, 0, table)
   end
 
 end
