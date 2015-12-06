@@ -4,9 +4,7 @@ defmodule SantaLights do
     filename
     |> parse_file
     |> Enum.reduce([], fn
-      {:toggle, reg}, on_regions -> toggle(reg, on_regions)
-    {:on, reg}, on_regions -> on(reg, on_regions)
-      {:off, reg}, on_regions -> off(reg, on_regions)
+      {action, reg}, on_regions -> act(action, reg, on_regions)
     end)
     |> sum
   end
@@ -36,22 +34,22 @@ defmodule SantaLights do
 
 
   # Subtract reg from all existing regions.
-  def off(reg, on_regions) do
+  def act(:off, reg, on_regions) do
     on_regions
     |> Enum.flat_map(&subtract(&1, reg))
   end
 
 
   # Subtract reg from all and place it in the output.
-  def on(reg, on_regions) do
-    [reg | off(reg, on_regions)]
+  def act(:on, reg, on_regions) do
+    [reg | act(:off, reg, on_regions)]
   end
 
 
   # Manually subtract reg from all existing regions, saving the
   # intersections and then subtract those from the toggle intersection
   # and keep whatever is left.
-  def toggle(reg, on_regions) do
+  def act(:toggle, reg, on_regions) do
     {new_grid, overlaps} =
       Enum.reduce(on_regions, {[], []}, fn old, {acc, overlaps} ->
         if intersection = two_dim_intersection(reg, old) do
@@ -62,7 +60,7 @@ defmodule SantaLights do
         end
       end)
 
-    Enum.reduce(overlaps, [reg], &off/2) ++ new_grid
+    Enum.reduce(overlaps, [reg], &act(:off, &1, &2)) ++ new_grid
   end
 
 
