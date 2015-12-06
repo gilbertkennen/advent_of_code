@@ -115,45 +115,53 @@ defmodule VariableLights do
   end
 
 
-  def on(map, coords) do
-    Map.update(map, coords, 1, &(&1 + 1))
+  def inc(table, coords, amount) do
+    :ets.update_counter(table, coords, amount, {coords, 0})
   end
 
-  def off(map, coords) do
-    Map.update(map, coords, 0, fn
-      n when n <= 1 -> 0
-      n -> n - 1
-    end)
+  def dec(table, coords, amount) do
+    :ets.update_counter(table, coords, {2, amount, 0, 0}, {coords, 0})
   end
 
-  def toggle(map, coords) do
-    Map.update(map, coords, 2, &(&1 + 2))
+  def act(:on, table, coords) do
+    inc(table, coords, 1)
   end
 
-  def do_stuff({action, ranges}, map) do
+  def act(:toggle, table, coords) do
+    inc(table, coords, 2)
+  end
+
+  def act(:off, table, coords) do
+    dec(table, coords, -1)
+  end
+
+  def do_stuff({action, ranges}, table) do
     block(ranges)
-    |> Enum.reduce(map, fn coords, map ->
-      IO.inspect action
-      case action do
-        :on -> on(map, coords)
-        :off -> off(map, coords)
-        :toggle -> toggle(map, coords)
-      end
-    end)
+    |> Enum.each(&act(action, table, &1))
   end
 
-  def sum(map) do
-    map
-    |> Enum.reduce(0, fn
-      {_, val}, acc -> acc + val
-    end)
+  def sum(table) do
+    :ets.foldl(fn {_, n}, acc -> acc + n end, 0, table)
+  end
+
+  def init do
+    :ets.new(__MODULE__, [:set])
+  end
+
+  def cleanup(table) do
+    :ets.delete(table)
   end
 
   def execute(filename) do
+    table = init()
+
     filename
     |> parse_file
-    |> Enum.reduce(%{}, &do_stuff/2)
-    |> sum
+    |> Enum.each(&do_stuff(&1, table))
+
+    result = sum(table)
+    cleanup(table)
+    result
   end
 
 end
