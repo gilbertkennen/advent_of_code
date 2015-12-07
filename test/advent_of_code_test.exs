@@ -1,8 +1,8 @@
 defmodule AdventOfCodeTest do
-  use ExUnit.Case
-  doctest AdventOfCode
+  use ExUnit.Case, async: true
+  doctest Day01
+  doctest Day02
+  doctest Day03
+  doctest Day04
 
-  test "the truth" do
-    assert 1 + 1 == 2
-  end
 end

@@ -50,17 +50,17 @@ defmodule SantaLights do
   # intersections and then subtract those from the toggle intersection
   # and keep whatever is left.
   def act(:toggle, reg, on_regions) do
-    {new_grid, overlaps} =
-      Enum.reduce(on_regions, {[], []}, fn old, {acc, overlaps} ->
+    {new_grid, intersections} =
+      Enum.reduce(on_regions, {[], []}, fn old, {acc, intersections} ->
         if intersection = two_dim_intersection(reg, old) do
           old_mask = negative(old, intersection)
-          {old_mask ++ acc, [intersection | overlaps]}
+          {old_mask ++ acc, [intersection | intersections]}
         else
-          {[old | acc], overlaps}
+          {[old | acc], intersections}
         end
       end)
 
-    Enum.reduce(overlaps, [reg], &act(:off, &1, &2)) ++ new_grid
+    Enum.reduce(intersections, [reg], &act(:off, &1, &2)) ++ new_grid
   end
 
 
@@ -77,7 +77,7 @@ defmodule SantaLights do
   # Removes a mask from the first region. Automatically generates four
   # possible new regions in an I shape and filters invalid ones.
   # This requires that the second region be fully contained within the first.
-  defp negative({lx..lxx, ly..lyy}, {rx..rxx, ry..ryy}) do
+  def negative({lx..lxx, ly..lyy}, {rx..rxx, ry..ryy}) do
     [{lx..lxx, ly..(ry-1)},
      {lx..lxx, (ryy+1)..lyy},
      {lx..(rx-1), ry..ryy},
@@ -88,7 +88,7 @@ defmodule SantaLights do
 
 
   # If both dimensions have a valid intersection, then there is a 2d intersection
-  defp two_dim_intersection({lx, ly}, {rx, ry}) do
+  def two_dim_intersection({lx, ly}, {rx, ry}) do
     case {one_dim_intersection(lx, rx), one_dim_intersection(ly, ry)} do
       {x, y} when x == nil or y == nil -> nil
       reg -> reg
@@ -96,10 +96,70 @@ defmodule SantaLights do
   end
 
 
-  defp one_dim_intersection(l..ll, r..rr) do
+  def one_dim_intersection(l..ll, r..rr) do
     if l < r, do: min = r, else: min = l
     if ll < rr, do: max = ll, else: max = rr
     if min <= max, do: min..max, else: nil
+  end
+
+end
+
+defmodule VariableLights2 do
+  import SantaLights, only: [parse_file: 1,
+                             two_dim_intersection: 2,
+                             negative: 2,
+                             subtract: 2]
+
+
+  def execute(filename) do
+    filename
+    |> parse_file
+    |> Enum.reduce([], fn
+      {action, reg}, on_regions -> act(action, reg, on_regions)
+    end)
+    |> sum
+  end
+
+  def sum(regions) do
+    regions
+    |> Enum.reduce(0, fn {{x..xx, y..yy}, val}, acc ->
+      acc + ((xx - x + 1) * (yy - y + 1) * val)
+    end)
+  end
+
+  def act(:on, reg, regions) do
+    do_stuff({reg, 1}, regions)
+  end
+
+  def act(:toggle, reg, regions) do
+    do_stuff({reg, 2}, regions)
+  end
+
+  def act(:off, reg, regions) do
+    do_stuff({reg, -1}, regions)
+  end
+
+  def do_stuff({reg, val}, regions) do
+    {new_regions, intersections} =
+      Enum.reduce(regions, {[], []}, fn
+        {o_reg, o_val}, {new_regions, intersections}->
+          if inter = two_dim_intersection(reg, o_reg) do
+            new_reg = negative(o_reg, inter) |> Enum.map(&{&1, o_val})
+            if (n_val = o_val + val) > 0, do: new_reg = [{inter, n_val}| new_reg]
+            {new_reg ++ new_regions , [inter | intersections]}
+          else
+            {[{o_reg, o_val} | new_regions], intersections}
+          end
+      end)
+
+    if val > 0 do
+      intersections
+      |> Enum.reduce([reg], &Enum.flat_map(&2, fn r -> subtract(r, &1) end))
+      |> Enum.map(&{&1, val})
+      |> Kernel.++(new_regions)
+    else
+      new_regions
+    end
   end
 
 end
