@@ -1,4 +1,4 @@
-defmodule SantaLights do
+defmodule Day06 do
 
   def execute(filename) do
     filename
@@ -97,15 +97,15 @@ defmodule SantaLights do
 
 
   def one_dim_intersection(l..ll, r..rr) do
-    if l < r, do: min = r, else: min = l
-    if ll < rr, do: max = ll, else: max = rr
+    min = if l < r, do: r, else: l
+    max = if ll < rr, do: ll, else: rr
     if min <= max, do: min..max, else: nil
   end
 
 end
 
-defmodule VariableLights2 do
-  import SantaLights, only: [parse_file: 1,
+defmodule Day06_2 do
+  import Day06, only: [parse_file: 1,
                              two_dim_intersection: 2,
                              negative: 2,
                              subtract: 2]
@@ -165,7 +165,7 @@ defmodule VariableLights2 do
 end
 
 defmodule VariableLights do
-  import SantaLights, only: [parse_file: 1]
+  import Day06, only: [parse_file: 1]
 
 
   def execute(filename) do
