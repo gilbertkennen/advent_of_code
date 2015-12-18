@@ -12,12 +12,47 @@ defmodule Day06 do
   end
 
 
+  # Toggles nullify their intersection
+  def combine_bool({:toggle, coords_l}, {:toggle, coords_r}) do
+    {new_l, intersection} = subtract(coords_l, coords_r)
+    {
+      regions(new_l, :toggle),
+      intersection,
+      []
+    }
+  end
+
+  # existing toggles flip the intersection, which is then done.
+  def combine_bool({type, coords_l}, {:toggle, coords_r}) do
+    {new_l, toggled} = subtract(coords_l, coords_r)
+
+    {
+      regions(new_l, type),
+      toggled,
+      :lists.reverse(regions(toggled, flip(type))),
+    }
+  end
+
+  # existing non-toggles are already set.
+  def combine_bool({type_l, coords_l}, {_, coords_r}) do
+    {new_l, _} = subtract(coords_l, coords_r)
+
+    {regions(new_l, type_l), [], []}
+  end
+
+
+  def flip(:on), do: :off
+  def flip(:off), do: :on
+
+
   def sum_part_one(regions) do
+    IO.inspect Enum.count(regions)
     Enum.reduce(regions, 0, fn
       {:off, _}, acc -> acc
       region, acc -> acc + size(region)
     end)
   end
+
 
   def part_two(filename) do
     filename
@@ -34,82 +69,25 @@ defmodule Day06 do
     |> sum_part_two
   end
 
-  def sum_part_two(regions) do
-    Enum.reduce(regions, 0, fn
-      {val, _}, acc when val <= 0 -> acc
-      {val, _} = region, acc ->
-        acc + size(region) * val
-    end)
-  end
-
-  def size({_, {x..xx, y..yy}}), do: ((xx - x + 1) * (yy - y + 1))
-
-
-  def add_region(region, regions, fun) do
-    add_region([region], regions, [], fun)
-  end
-
-  def add_region(new, [], acc, _), do: :lists.reverse(new, acc)
-  def add_region(new, [region | regions], acc, fun) do
-    {new, intersections, existing} =
-      Enum.reduce(new, {[], [], []}, fn n_reg, n_acc ->
-        fun.(n_reg, region) |> combine_accumulators(n_acc)
-      end)
-
-    acc =
-      subtract_multi(region, intersections)
-      |> :lists.reverse(existing)
-      |> :lists.reverse(acc)
-
-    add_region(new, regions, acc, fun)
-  end
-
-
-  # Toggles nullify their intersection
-  def combine_bool({:toggle, coords_l}, {:toggle, coords_r}) do
-    {new_l, intersection} = subtract(coords_l, coords_r)
-    {
-      regions(new_l, :toggle),
-      intersection,
-      []
-    }
-  end
-  # existing toggles flip the intersection, which is then done.
-  def combine_bool({type, coords_l}, {:toggle, coords_r}) do
-    {new_l, toggled} = subtract(coords_l, coords_r)
-
-    {
-      regions(new_l, type),
-      toggled,
-      :lists.reverse(regions(toggled, flip(type))),
-    }
-  end
-  # existing non-toggles are already set.
-  def combine_bool({type_l, coords_l}, {_, coords_r}) do
-    {new_l, _} = subtract(coords_l, coords_r)
-
-    {regions(new_l, type_l), [], []}
-  end
-
 
   # This algorithm can put negative regions into the existing area, but they
-  # shouldn't count, so delete them.
+  # shouldn't count, so delete them when we see them.
   def combine_lum(l, {val_r, coords_r}) when val_r <= 0 do
     {[l], [coords_r], []}
   end
 
   # When we add a negative region, we should look for something to reduce.
-  # This is intentionally a bit more generic than it has to be in order to
+  # This is intentionally a bit more generic than it needs to be in order to
   # handle other luminosity systems.
   def combine_lum({val_l, coords_l}, {val_r, coords_r}) when val_l < 0 do
     {new_l, intersection} = subtract(coords_l, coords_r)
     i_val = val_l + val_r
     new_l =
-      if i_val < 0 do
-        (regions(new_l, val_l) ++ regions(intersection, i_val))
-      else
-        regions(new_l, val_l)
-      end
+    if i_val < 0 do
+      (regions(new_l, val_l) ++ regions(intersection, i_val))
+    else
+      regions(new_l, val_l)
+    end
 
     {
       new_l,
@@ -124,6 +102,38 @@ defmodule Day06 do
   end
 
 
+  def sum_part_two(regions) do
+    IO.inspect Enum.count(regions)
+    Enum.reduce(regions, 0, fn
+      {val, _}, acc when val <= 0 -> acc
+      {val, _} = region, acc ->
+        acc + size(region) * val
+    end)
+  end
+
+
+  def add_region(region, regions, combine_fun) do
+    add_region([region], regions, [], combine_fun)
+  end
+
+
+  def add_region(new, [], acc, _), do: :lists.reverse(new, acc)
+  def add_region(new, [region | regions], acc, combine_fun) do
+    {new, intersections, existing} =
+      Enum.reduce(new, {[], [], []}, fn n_reg, n_acc ->
+        combine_fun.(n_reg, region)
+        |> combine_accumulators(n_acc)
+      end)
+
+    acc =
+      subtract_multi(region, intersections)
+      |> :lists.reverse(existing)
+      |> :lists.reverse(acc)
+
+    add_region(new, regions, acc, combine_fun)
+  end
+
+
   def combine_accumulators({l_acc1, l_acc2, l_acc3}, {r_acc1, r_acc2, r_acc3}) do
     {
       :lists.reverse(l_acc1, r_acc1),
@@ -132,13 +142,14 @@ defmodule Day06 do
     }
   end
 
-  def flip(:on), do: :off
-  def flip(:off), do: :on
+
+  def size({_, {x..xx, y..yy}}), do: ((xx - x + 1) * (yy - y + 1))
 
 
   def regions(coords, value) do
     for coord <- coords, do: {value, coord}
   end
+
 
   def subtract(l, r) do
     if intersection = two_dim_intersection(l, r) do
@@ -147,6 +158,7 @@ defmodule Day06 do
       {[l], []}
     end
   end
+
 
   def subtract_multi({type, coords}, intersections) do
     intersections
@@ -200,6 +212,4 @@ defmodule Day06 do
       }
     end)
   end
-
-
 end
