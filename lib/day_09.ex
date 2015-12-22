@@ -19,8 +19,8 @@ defmodule Day09 do
     perm(nodes)
   end
 
-  defp perm([]), do: [[]]
-  defp perm(list) do
+  def perm([_] = l), do: [l]
+  def perm(list) do
     for h <- list, t <- perm(list -- [h]), do: [h|t]
   end
 
