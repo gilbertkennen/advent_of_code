@@ -9,7 +9,7 @@ end
 
 
 defmodule Day22.Mage do
-  defstruct [:hp, {:mana, 0}]
+  defstruct [:hp, {:mana, 0}, {:armor, 0}]
 end
 
 
@@ -49,7 +49,7 @@ defmodule Day22 do
   def boss_turn(mage, boss, spells, effects, hp_loss, mana_used, max_mana) do
     case check_finished(mage, boss, mana_used, max_mana) do
       false ->
-        mage = attack(boss, mage, effects)
+        mage = attack(boss, mage)
         {mage, boss, effects} = apply_effects(mage, boss, effects)
         mage_turn(mage, boss, spells, effects, hp_loss, mana_used, max_mana)
       result -> result
@@ -57,14 +57,10 @@ defmodule Day22 do
   end
 
 
-  def attack(fighter, opponent, effects) do
-    %{opponent | hp: opponent.hp - max(1, fighter.damage - armor_sum(effects))}
-  end
-
-
-  def armor_sum(effects) do
-    effects
-    |> Enum.reduce(0, &(&1.armor + &2))
+  def attack(fighter, opponent) do
+    %{opponent |
+      hp: opponent.hp - max(1, fighter.damage - opponent.armor)
+     }
   end
 
 
@@ -91,16 +87,20 @@ defmodule Day22 do
 
 
   def apply_effects(mage, boss, effects) do
+    mage = %{mage | armor: 0}
+
     effects
     |> Enum.reduce({mage, boss, []}, &apply_effect(&1, &2))
   end
 
 
   def apply_effect(%{duration: 1} = e, {mage, boss, acc}) do
+    heal = if mage.hp <= 0, do: 0, else: e.heal
     {
       %{mage |
-        hp: mage.hp + e.heal,
-        mana: mage.mana + e.mana
+        hp: mage.hp + heal,
+        mana: mage.mana + e.mana,
+        armor: mage.armor + e.armor
        },
       %{boss |
         hp: boss.hp - e.damage
