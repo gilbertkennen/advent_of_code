@@ -23,10 +23,11 @@ defmodule Day25 do
 
   def do_mod_pow(_, 0, _, acc), do: acc
 
+  def do_mod_pow(base, exp, mod, acc) when is_odd(exp) do
+    do_mod_pow(base, exp - 1, mod, rem(acc * base, mod))
+  end
+
   def do_mod_pow(base, exp, mod, acc) do
-    if is_odd(exp) do
-      acc = rem(acc * base, mod)
-    end
     do_mod_pow(rem(base * base, mod), bsr(exp, 1), mod, acc)
   end
 end
