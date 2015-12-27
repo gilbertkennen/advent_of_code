@@ -46,7 +46,6 @@ defmodule Day06 do
 
 
   def sum_part_one(regions) do
-    IO.inspect Enum.count(regions)
     Enum.reduce(regions, 0, fn
       {:off, _}, acc -> acc
       region, acc -> acc + size(region)
@@ -103,7 +102,6 @@ defmodule Day06 do
 
 
   def sum_part_two(regions) do
-    IO.inspect Enum.count(regions)
     Enum.reduce(regions, 0, fn
       {val, _}, acc when val <= 0 -> acc
       {val, _} = region, acc ->
@@ -209,6 +207,165 @@ defmodule Day06 do
       {String.to_atom(action),
        {to_integer(from_x)..to_integer(to_x),
         to_integer(from_y)..to_integer(to_y)}
+      }
+    end)
+  end
+end
+
+
+defmodule Day06_2 do
+
+  defmodule Row do
+
+    def start_link(length, init) do
+      Agent.start_link(fn ->
+        (1..length)
+        |> Enum.map(fn _ -> init end)
+      end)
+    end
+
+
+    def stop(row) do
+      Agent.stop(row)
+    end
+
+
+    def apply_action_to_cols(row, action_fun, cols) do
+      Agent.cast(row, fn vals ->
+        {head, mid, tail} = split_3(vals, cols)
+        mid = Enum.map(mid, action_fun)
+        combine(head, mid, tail)
+      end)
+    end
+
+
+    def sum(row) do
+      Agent.get(row, &Enum.sum/1)
+    end
+
+
+    def combine(head, mid, tail) do
+      :lists.reverse(head, :lists.reverse(mid, tail))
+    end
+
+
+    def split_3(vals, l..r) do
+      {head, rest} = split(vals, l)
+      {mid, tail} = split(rest, r - l + 1)
+      {head, mid, tail}
+    end
+
+
+    def split(vals, n) do
+      split(vals, n, [])
+    end
+
+
+    def split(vals, 0, acc), do: {acc, vals}
+
+    def split([], _, acc), do: {acc, []}
+
+    def split([h | t], n, acc), do: split(t, n - 1, [h | acc])
+
+  end
+
+
+  def part_one(filename) do
+    filename
+    |> parse_file
+    |> run_lights(&part_one_action/1)
+  end
+
+
+  def part_one_action(:toggle) do
+    fn
+      1 -> 0
+      0 -> 1
+    end
+  end
+
+  def part_one_action(:off), do: fn _ -> 0 end
+
+  def part_one_action(:on), do: fn _ -> 1 end
+
+
+  def part_two(filename) do
+    filename
+    |> parse_file
+    |> run_lights(&part_two_action/1)
+  end
+
+
+  def part_two_action(:off) do
+    fn
+      n when n <= 1 -> 0
+      n -> n - 1
+    end
+  end
+
+  def part_two_action(:on), do: fn n -> n + 1 end
+
+  def part_two_action(:toggle), do: fn n -> n + 2 end
+
+
+  def run_lights(actions, act_fun) do
+    row_processes = generate_rows(1000, 1000, 0)
+
+    actions
+    |> apply_actions_to_row_processes(row_processes, act_fun)
+
+    light_count = row_processes |> count_lights
+
+    Enum.each(row_processes, &Row.stop/1)
+
+    light_count
+  end
+
+
+  def generate_rows(count, length, init) do
+    (1..count)
+    |> Enum.map(fn _ -> {:ok, row} = Row.start_link(length, init); row end)
+  end
+
+
+  def stop_rows(rows) do
+    Enum.each(rows, &Row.stop/1)
+  end
+
+
+  def apply_actions_to_row_processes(actions, row_processes, act_fun) do
+    actions
+    |> Enum.each(fn {action, {cols, rows}} ->
+      apply_action_to_cols_in_rows(row_processes, rows,
+                                   act_fun.(action), cols)
+      end)
+  end
+
+  def apply_action_to_cols_in_rows(row_processes, rows, action_fun, cols) do
+    row_processes
+    |> Enum.slice(rows)
+    |> Enum.each(&Row.apply_action_to_cols(&1, action_fun, cols))
+  end
+
+
+  def count_lights(row_processes) do
+    row_processes
+    |> Enum.map(&Row.sum/1)
+    |> Enum.sum
+  end
+
+
+  def parse_file(filename) do
+    import String, only: [to_integer: 1]
+    filename
+    |> File.stream!
+    |> Stream.map(fn line ->
+      [_, action, from_x, from_y, to_x, to_y] =
+        Regex.run(~r/(toggle|on|off) (\d+),(\d+) through (\d+),(\d+)/, line)
+
+      {String.to_atom(action),
+       {(to_integer(from_x) - 1)..(to_integer(to_x) - 1),
+        (to_integer(from_y) - 1)..(to_integer(to_y) - 1)}
       }
     end)
   end
