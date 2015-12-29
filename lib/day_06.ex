@@ -277,12 +277,7 @@ defmodule Day06_2 do
   end
 
 
-  def part_one_action(:toggle) do
-    fn
-      1 -> 0
-      0 -> 1
-    end
-  end
+  def part_one_action(:toggle), do: &abs(&1 - 1)
 
   def part_one_action(:off), do: fn _ -> 0 end
 
@@ -369,4 +364,165 @@ defmodule Day06_2 do
       }
     end)
   end
+end
+
+defmodule Day06_3 do
+  use Bitwise
+
+  def part_one(filename) do
+    filename
+    |> parse_file
+    |> run_lights(&part_one_action/3)
+  end
+
+
+  def part_one_action(:off, [row], bitmask) do
+    [
+      row
+      |> Bitwise.bxor(bitmask)
+      |> Bitwise.band(row)
+    ]
+  end
+
+  def part_one_action(:on, [row], bitmask) do
+    [
+      row
+      |> Bitwise.bor(bitmask)
+    ]
+  end
+
+  def part_one_action(:toggle, [row], bitmask) do
+    [
+      row
+      |> Bitwise.bxor(bitmask)
+    ]
+  end
+
+
+  def part_two(filename) do
+    filename
+    |> parse_file
+    |> run_lights(&part_two_action/3)
+  end
+
+
+  def part_two_action(:on, row, bitmap) do
+    increment(row, bitmap)
+  end
+
+  def part_two_action(:toggle, [h | t], bitmap) do
+    [h | increment(t, bitmap)]
+  end
+
+  def part_two_action(:off, row, bitmap) do
+    deincrement(row, Enum.reduce(row, &Bitwise.bor/2) |> Bitwise.band(bitmap) )
+  end
+
+
+  def increment(rem, 0), do: rem
+
+  def increment([], bitmap), do: [bitmap]
+
+  def increment([h | t], bitmap) do
+    [Bitwise.bxor(h, bitmap) | increment(t, Bitwise.band(h, bitmap))]
+  end
+
+
+  def deincrement(rem, 0), do: rem
+
+  def deincrement([h | t], bitmap) do
+    new_t =
+      case deincrement(t, h |> Bitwise.bxor(bitmap) |> Bitwise.band(bitmap)) do
+        [0] -> []
+        result -> result
+      end
+
+    [Bitwise.bxor(h, bitmap) | new_t]
+  end
+
+
+  def run_lights(actions, act_fun) do
+    actions
+    |> Enum.reduce(generate_grid(1000, 1000, [0]), fn {action, {rows, cols}}, grid ->
+      bitmask = make_bitmask(cols)
+      {head, mid, tail} = split_3(grid, rows)
+      mid = Enum.map(mid, fn row ->
+        act_fun.(action, row, bitmask)
+      end)
+      combine(head, mid, tail)
+    end)
+    |> Enum.map(&multi_popcount/1)
+    |> Enum.sum
+  end
+
+
+
+  def multi_popcount(list) do
+    list
+    |> Enum.reduce({0, 1}, fn n, {acc, mult} ->
+      {acc + popcount(n) * mult, mult * 2}
+    end)
+    |> elem(0)
+  end
+
+
+  def popcount(n) do
+    for(<< bit::1 <- :binary.encode_unsigned(n) >>, do: bit)
+    |> Enum.sum
+  end
+
+
+  def generate_grid(rows, _, init) do
+    (1..rows)
+    |> Enum.map(fn _ -> init end)
+  end
+
+
+  def make_bitmask(from..to) do
+    1
+    |> Bitwise.bsl(to - from + 1)
+    |> Kernel.-(1)
+    |> Bitwise.bsl(from)
+  end
+
+
+  def combine(head, mid, tail) do
+    :lists.reverse(head, :lists.reverse(mid, tail))
+  end
+
+
+  def split_3(vals, l..r) do
+    {head, rest} = split(vals, l)
+    {mid, tail} = split(rest, r - l + 1)
+    {head, mid, tail}
+  end
+
+
+  def split(vals, n) do
+    split(vals, n, [])
+  end
+
+
+  def split(vals, 0, acc), do: {acc, vals}
+
+  def split([], _, acc), do: {acc, []}
+
+  def split([h | t], n, acc), do: split(t, n - 1, [h | acc])
+
+
+  def parse_file(filename) do
+    import String, only: [to_integer: 1]
+    filename
+    |> File.stream!
+    |> Stream.map(fn line ->
+      [_, action, from_x, from_y, to_x, to_y] =
+        Regex.run(~r/(toggle|on|off) (\d+),(\d+) through (\d+),(\d+)/, line)
+
+      {String.to_atom(action),
+       {(to_integer(from_x) - 1)..(to_integer(to_x) - 1),
+       (to_integer(from_y) - 1)..(to_integer(to_y) - 1)}
+      }
+    end)
+  end
+
 end
